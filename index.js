@@ -136,7 +136,7 @@ class Literal {
             }
 
             console.log('\x1b[35m%s\x1b[0m', tokens[this.pos + 1].value)
-            // we add 2 because we also check the token after print keyword
+            
             this.pos += 2
           } else if (token.type === "keyword" && (token.value === "add" || token.value === "subtract" || token.value === "multiply" || token.value === "divide")) {
             if (tokens[this.pos + 1].type === "string" || !tokens[this.pos + 1]) {
