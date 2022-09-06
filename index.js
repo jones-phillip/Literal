@@ -6,9 +6,12 @@ class Literal {
         this.codes = codes;
         this.length = codes.length;
         this.pos = 0;
-        this.BUILT_IN_KEYWORDS = ["print", "add", "subtract", "and"];
-        this.varChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-        this.intValues = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+        this.BUILT_IN_KEYWORDS = ["print", "add", "subtract", "multiply", "divide", "and"];
+        this.spaceExpression = /^[\n\r\s]+/;
+        this.quoteExpression = /^["']+$/;
+        this.stringExpression = /^[\w$.\-]+$/;
+        this.keywordExpression = /^[a-zA-Z_]+$/;
+        this.intExpression = /^[0-9.-]+$/;
     }
 
     tokenize() {
@@ -16,14 +19,14 @@ class Literal {
         while (this.pos < this.length) {
             let currentChar = this.codes[this.pos];
 
-            if (currentChar === " " || currentChar === "\n") {
+            if (this.spaceExpression.exec(currentChar)) {
                 this.pos++;
                 continue;
-            }  else if (currentChar === '"') {
+            }  else if (this.quoteExpression.exec(currentChar)) {
                 tokens = this.createStringToken(tokens);
-            } else if (this.varChars.includes(currentChar)) {
+            } else if (this.keywordExpression.exec(currentChar)) {
                 tokens = this.createKeywordToken(currentChar, tokens);
-            } else if (this.intValues.indexOf(parseInt(currentChar)) !== -1) {
+            } else if (this.intExpression.exec(currentChar)) {
                 tokens = this.createIntToken(currentChar, tokens);
             } else {
                 return {
@@ -67,7 +70,7 @@ class Literal {
         let res = currentChar;
         this.pos++;
 
-        while(this.varChars.includes(this.codes[this.pos]) && this.pos < this.length) {
+        while(this.keywordExpression.exec(this.codes[this.pos]) && this.pos < this.length) {
             res += this.codes[this.pos];
             this.pos++;
         }
@@ -90,12 +93,21 @@ class Literal {
         let res = currentChar;
         this.pos++;
 
-        while(this.intValues.indexOf(parseInt(this.codes[this.pos])) !== -1 && this.pos < this.length) {
+        while(this.intExpression.exec(this.codes[this.pos]) && this.pos < this.length) {
             res += this.codes[this.pos];
             this.pos++;
         }
         
         this.pos++;
+
+        if (res.includes(".")) {
+            tokens.push({
+                type: "int",
+                value: parseFloat(res)
+            });
+
+            return tokens;
+        }
 
         tokens.push({
             type: "int",
@@ -106,31 +118,64 @@ class Literal {
     }
 
     parse(tokens) {
-        console.log(tokens);
         const len = tokens.length
-        let pos = 0
-        while(pos < len) {
-          const token = tokens[pos]
-          // if token is a print keyword
+        this.pos = 0
+        while(this.pos < len) {
+          const token = tokens[this.pos]
+          
           if(token.type === "keyword" && token.value === "print") {
-            // if the next token doesn't exist
-            if(!tokens[pos + 1]) {
+            
+            if(!tokens[this.pos + 1]) {
               return console.log("Unexpected end of line, expected string")
             }
-            // check if the next token is a string
-            let isString = tokens[pos + 1].type === "string"
-            // if the next token is not a string
+            
+            let isString = tokens[this.pos + 1].type === "string"
+            
             if(!isString) {
-              return console.log(`Unexpected token ${tokens[pos + 1].type}, expected string`)
+              return console.log(`Unexpected token ${tokens[this.pos + 1].type}, expected string`)
             }
-            // if we reach this point, we have valid syntax
-            // so we can print the string
-            console.log('\x1b[35m%s\x1b[0m', tokens[pos + 1].value)
+
+            console.log('\x1b[35m%s\x1b[0m', tokens[this.pos + 1].value)
             // we add 2 because we also check the token after print keyword
-            pos += 2
-          } else if (token.type === "keyword" && (token.value === "add" || token.value === "subtract")) {
-            return console.log("arithmatic");
-          } else { // if we didn't match any rules
+            this.pos += 2
+          } else if (token.type === "keyword" && (token.value === "add" || token.value === "subtract" || token.value === "multiply" || token.value === "divide")) {
+            if (tokens[this.pos + 1].type === "string" || !tokens[this.pos + 1]) {
+                let error = !tokens[this.pos + 1] ? `Unexpected end on line, expected int` : `Unexpected token ${tokens[this.pos + 1].type}, expected int`;
+
+                return console.log(error);
+            }
+
+            if (tokens[this.pos + 2].value !== "and" || !tokens[this.pos + 2]) {
+                let error = !tokens[this.pos + 2] ? `Unexpected end on line, expected "add"` : `Unexpected token ${tokens[this.pos + 2].value}, expected "add"`;
+
+                return console.log(error);
+            }
+
+            if (tokens[this.pos + 3].type === "string" || !tokens[this.pos + 3]) {
+                let error = !tokens[this.pos + 3] ? `Unexpected end on line, expected int` : `Unexpected token ${tokens[this.pos + 3].type}, expected int`;
+
+                return console.log(error);
+            }
+
+            switch(token.value) {
+                case "add":
+                    console.log(tokens[this.pos + 1].value + tokens[this.pos + 3].value);
+                    break;
+                case "subtract":
+                    console.log(tokens[this.pos + 1].value - tokens[this.pos + 3].value);
+                    break;
+                case "multiply":
+                    console.log(tokens[this.pos + 1].value * tokens[this.pos + 3].value);
+                    break;
+                case "divide":
+                    console.log(tokens[this.pos + 1].value / tokens[this.pos + 3].value);
+                    break;
+                default:
+                    return console.log(`Unexpected keyword ${token.value}`);
+            }
+
+            this.pos += 4;
+          } else { 
             return console.log(`Unexpected token ${token.type}`)
           } 
         }
